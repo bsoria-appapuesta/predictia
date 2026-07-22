@@ -1,90 +1,39 @@
-const getPrediction = (req, res) => {
+const predictionService = require("../services/predictionService");
 
-  res.json({
-    producto: "Ejemplo",
-    prediccion: "Sin análisis todavía",
-    confianza: "0%"
-  });
+// GET /predictions?local=River&visitante=Boca
+const getPrediction = async (req, res) => {
+  try {
+    // Si la URL trae query params los usa, si no, usa un ejemplo por defecto
+    const local = req.query.local || "River Plate";
+    const visitante = req.query.visitante || "Boca Juniors";
 
+    const result = await predictionService.analyzeMatch({ local, visitante });
+    
+    // Devolvemos el texto listo para leer
+    res.send(`<pre>${result.textMessage}</pre>`);
+  } catch (error) {
+    console.error("Error en getPrediction:", error);
+    res.status(500).json({ error: "Error al generar la predicción" });
+  }
 };
 
+// POST /predictions (Para cuando WhatsApp envié JSON)
+const createPrediction = async (req, res) => {
+  try {
+    const { local, visitante } = req.body;
 
-const createPrediction = (req, res) => {
+    if (!local || !visitante) {
+      return res.status(400).json({ 
+        error: "Se requieren los nombres de los equipos 'local' y 'visitante'." 
+      });
+    }
 
-  const { 
-    partido, 
-    river, 
-    empate, 
-    boca,
-    rendimientoLocal,
-    rendimientoVisitante
-  } = req.body;
-
-
-  // Convertimos datos a números
-  const votosLocal = Number(river);
-  const votosEmpate = Number(empate);
-  const votosVisitante = Number(boca);
-
-  const rendimientoL = Number(rendimientoLocal);
-  const rendimientoV = Number(rendimientoVisitante);
-
-
-  // Porcentaje de encuesta
-  const totalVotos = votosLocal + votosEmpate + votosVisitante;
-
-  let porcentajeLocal = 0;
-  let porcentajeVisitante = 0;
-  let porcentajeEmpate = 0;
-
-  if(totalVotos > 0){
-    porcentajeLocal = (votosLocal / totalVotos) * 100;
-    porcentajeVisitante = (votosVisitante / totalVotos) * 100;
-    porcentajeEmpate = (votosEmpate / totalVotos) * 100;
+    const result = await predictionService.analyzeMatch({ local, visitante });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error en createPrediction:", error);
+    res.status(500).json({ error: "Error al procesar la solicitud" });
   }
-
-
-  // Combinamos encuesta + rendimiento
-  const puntajeLocal = (porcentajeLocal * 0.5) + (rendimientoL * 0.5);
-  const puntajeVisitante = (porcentajeVisitante * 0.5) + (rendimientoV * 0.5);
-
-
-  let prediccion = "";
-  let confianza = 0;
-
-
-  if(puntajeLocal > puntajeVisitante && puntajeLocal > porcentajeEmpate){
-
-    prediccion = "El equipo local tiene mayor probabilidad de ganar";
-    confianza = Math.round(puntajeLocal);
-
-  }
-  else if(puntajeVisitante > puntajeLocal && puntajeVisitante > porcentajeEmpate){
-
-    prediccion = "El equipo visitante tiene mayor probabilidad de ganar";
-    confianza = Math.round(puntajeVisitante);
-
-  }
-  else {
-
-    prediccion = "El partido tiene alta probabilidad de empate";
-    confianza = Math.round(porcentajeEmpate);
-
-  }
-
-
-  res.json({
-    producto: partido,
-    prediccion,
-    confianza: confianza + "%"
-  });
-
-};
-
-
-module.exports = {
-  getPrediction,
-  createPrediction
 };
 
 module.exports = {
